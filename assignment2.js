@@ -8,6 +8,10 @@ var vertexCount = 0;
 var uniformModelViewLoc = null;
 var uniformProjectionLoc = null;
 var heightmapData = null;
+//transformation variables
+var scaleFactor = 1;
+var rotationY = 0;
+var rotationZ = 0;
 
 function processImage(img)
 {
@@ -116,21 +120,33 @@ function draw()
 	var farClip = 20.0;
 
 	// perspective projection
-	var projectionMatrix = perspectiveMatrix(
-		fovRadians,
-		aspectRatio,
-		nearClip,
-		farClip,
-	);
+	var projectionMatrix;
+	if (document.querySelector("#projection").value == 'perspective')
+	{
+		projectionMatrix= perspectiveMatrix(
+			fovRadians,
+			aspectRatio,
+			nearClip,
+			farClip,
+		);
+	}
+	else {
+		// TODO: implement orthographic projection 
+		// (see helper function in utils.js)
+		projectionMatrix = identityMatrix();
+		//projectionMatrix = orthographicMatrix();
+	}
 
 	// eye and target
 	var eye = [0, 5, 5];
 	var target = [0, 0, 0];
 
-	var modelMatrix = identityMatrix();
-
 	// TODO: set up transformations to the model
-
+	//var rotationY = (parseInt(document.querySelector("#y-rotation").value)) * Math.PI / 180;
+	//var rotationZ = (parseInt(document.querySelector("#z-rotation").value)) * Math.PI / 180;
+	
+	var modelMatrix = multiplyMatrices(rotateYMatrix(rotationY), rotateZMatrix(rotationZ));
+	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(scaleFactor, scaleFactor, scaleFactor));
 	// setup viewing matrix
 	var eyeToTarget = subtract(target, eye);
 	var viewMatrix = setupViewMatrix(eye, target);
@@ -257,9 +273,11 @@ function addMouseCallback(canvas)
 		if (e.deltaY < 0) 
 		{
 			console.log("Scrolled up");
+			scaleFactor+=0.1;
 			// e.g., zoom in
 		} else {
 			console.log("Scrolled down");
+			scaleFactor-=0.1;
 			// e.g., zoom out
 		}
 	});
@@ -274,6 +292,10 @@ function addMouseCallback(canvas)
 		console.log('mouse drag by: ' + deltaX + ', ' + deltaY);
 
 		// implement dragging logic
+		if(!leftMouse){
+			rotationY = deltaX * Math.PI / 180;
+			rotationZ = deltaY * Math.PI / 180;
+		}
 	});
 
 	document.addEventListener("mouseup", function () {
