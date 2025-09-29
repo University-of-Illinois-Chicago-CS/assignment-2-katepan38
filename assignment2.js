@@ -133,8 +133,12 @@ function draw()
 	else {
 		// TODO: implement orthographic projection 
 		// (see helper function in utils.js)
-		projectionMatrix = identityMatrix();
-		//projectionMatrix = orthographicMatrix();
+		var left = +gl.canvas.width;
+		var top = 0;
+		var right = 0;
+		var bottom = +gl.canvas.height;
+		//projectionMatrix = identityMatrix();
+		projectionMatrix = orthographicMatrix(left, right, bottom, top, nearClip, farClip);
 	}
 
 	// eye and target
@@ -142,18 +146,16 @@ function draw()
 	var target = [0, 0, 0];
 
 	// TODO: set up transformations to the model
-	//var rotationY = (parseInt(document.querySelector("#y-rotation").value)) * Math.PI / 180;
-	//var rotationZ = (parseInt(document.querySelector("#z-rotation").value)) * Math.PI / 180;
 	
 	var modelMatrix = multiplyMatrices(rotateYMatrix(rotationY), rotateZMatrix(rotationZ));
 	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(scaleFactor, scaleFactor, scaleFactor));
+	
 	// setup viewing matrix
 	var eyeToTarget = subtract(target, eye);
 	var viewMatrix = setupViewMatrix(eye, target);
 
 	// model-view Matrix = view * model
 	var modelviewMatrix = multiplyMatrices(viewMatrix, modelMatrix);
-
 
 	// enable depth testing
 	gl.enable(gl.DEPTH_TEST);
@@ -293,8 +295,8 @@ function addMouseCallback(canvas)
 
 		// implement dragging logic
 		if(!leftMouse){
-			rotationY = deltaX * Math.PI / 180;
-			rotationZ = deltaY * Math.PI / 180;
+			rotationY = deltaX / 180;
+			rotationZ = deltaY / 180;
 		}
 	});
 
