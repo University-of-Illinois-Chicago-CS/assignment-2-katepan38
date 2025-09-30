@@ -134,11 +134,10 @@ function draw()
 	else {
 		// TODO: implement orthographic projection 
 		// (see helper function in utils.js)
-		var left = +gl.canvas.width;
-		var top = 0;
-		var right = 0;
-		var bottom = +gl.canvas.height;
-		//projectionMatrix = identityMatrix();
+		var left =  5 * -aspectRatio;
+		var right = 5 * +aspectRatio;
+		var bottom = 5;
+		var top = -5;
 		projectionMatrix = orthographicMatrix(left, right, bottom, top, nearClip, farClip);
 	}
 
