@@ -83,6 +83,7 @@ window.loadImageFile = function(event)
 					heightmapData.width: width of map (number of columns)
 					heightmapData.height: height of the map (number of rows)
 			*/
+			gl.drawArrays(heightmapData.data);
 			console.log('loaded image: ' + heightmapData.width + ' x ' + heightmapData.height);
 
 		};
@@ -146,9 +147,10 @@ function draw()
 	var target = [0, 0, 0];
 
 	// TODO: set up transformations to the model
-	
+	var heightScale = parseInt(document.querySelector("#height").value)/500;
 	var modelMatrix = multiplyMatrices(rotateYMatrix(rotationY), rotateZMatrix(rotationZ));
 	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(scaleFactor, scaleFactor, scaleFactor));
+	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(1, heightScale, 1));
 	
 	// setup viewing matrix
 	var eyeToTarget = subtract(target, eye);
