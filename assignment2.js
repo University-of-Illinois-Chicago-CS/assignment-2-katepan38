@@ -12,6 +12,8 @@ var heightmapData = null;
 var scaleFactor = 1;
 var rotationY = 0;
 var rotationZ = 0;
+var eyeX = 0;
+var eyeY = 0;
 
 function processImage(img)
 {
@@ -75,6 +77,62 @@ window.loadImageFile = function(event)
 			// heightmapData is globally defined
 			heightmapData = processImage(img);
 			
+			var positions = [];
+			
+			// Create a grid of triangles
+			// Loop through each cell in the grid (we'll make 2 triangles per cell)
+			for (var y = 0; y < heightmapData.height - 1; y++) {
+				for (var x = 0; x < heightmapData.width - 1; x++) {
+					// Get the height values at the four corners of this cell
+					var topLeft = heightmapData.data[y * heightmapData.width + x];
+					var topRight = heightmapData.data[y * heightmapData.width + (x + 1)];
+					var bottomLeft = heightmapData.data[(y + 1) * heightmapData.width + x];
+					var bottomRight = heightmapData.data[(y + 1) * heightmapData.width + (x + 1)];
+					
+					// Convert grid coordinates to world coordinates
+					// Center the mesh at origin and scale it appropriately
+					var scale = 5.0 / Math.max(heightmapData.width, heightmapData.height); // Scale to fit in a reasonable size
+					
+					var x0 = (x - heightmapData.width / 2) * scale;
+					var x1 = ((x + 1) - heightmapData.width / 2) * scale;
+					var y0 = (y - heightmapData.height / 2) * scale;
+					var y1 = ((y + 1) - heightmapData.height / 2) * scale;
+					
+					// Create two triangles for this grid cell
+					// Triangle 1: top-left, bottom-left, top-right
+					var triangle1 = [
+						x0, topLeft, y0,
+						x0, bottomLeft, y1,
+						x1, topRight, y0
+					];
+					positions.push(...triangle1);
+					
+					// Triangle 2: top-right, bottom-left, bottom-right
+					var triangle2 = [
+						x1, topRight, y0,
+						x0, bottomLeft, y1,
+						x1, bottomRight, y1
+					];
+					positions.push(...triangle2);
+				}
+			}
+			vertexCount = positions.length / 3;
+			var meshVertices = new Float32Array(positions);
+			var posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, meshVertices);
+			
+			// Update the VAO with the new position buffer
+			var posAttribLoc = gl.getAttribLocation(program, "position");
+			vao = createVAO(gl, 
+			// positions
+			posAttribLoc, posBuffer, 
+
+			// normals (unused in this assignments)
+			null, null, 
+
+			// colors (not needed--computed by shader)
+			null, null
+			);
+			
 			/*
 				TODO: using the data in heightmapData, create a triangle mesh
 					heightmapData.data: array holding the actual data, note that 
@@ -83,7 +141,6 @@ window.loadImageFile = function(event)
 					heightmapData.width: width of map (number of columns)
 					heightmapData.height: height of the map (number of rows)
 			*/
-			gl.drawArrays(heightmapData.data);
 			console.log('loaded image: ' + heightmapData.width + ' x ' + heightmapData.height);
 
 		};
@@ -136,14 +193,15 @@ function draw()
 		// (see helper function in utils.js)
 		var left =  5 * -aspectRatio;
 		var right = 5 * +aspectRatio;
-		var bottom = 5;
-		var top = -5;
+		var bottom = -5;
+		var top = 5;
 		projectionMatrix = orthographicMatrix(left, right, bottom, top, nearClip, farClip);
 	}
 
 	// eye and target
-	var eye = [0, 5, 5];
+	var eye = [eyeX, eyeY, 5];
 	var target = [0, 0, 0];
+	
 
 	// TODO: set up transformations to the model
 	var heightScale = parseInt(document.querySelector("#height").value)/500;
@@ -153,6 +211,7 @@ function draw()
 	
 	// setup viewing matrix
 	var eyeToTarget = subtract(target, eye);
+	target = add(eye, [0, 0, -1]);
 	var viewMatrix = setupViewMatrix(eye, target);
 
 	// model-view Matrix = view * model
@@ -295,6 +354,10 @@ function addMouseCallback(canvas)
 		console.log('mouse drag by: ' + deltaX + ', ' + deltaY);
 
 		// implement dragging logic
+		if(leftMouse){
+			eyeX = deltaX / 50;
+			eyeY = -deltaY / 50;
+		}
 		if(!leftMouse){
 			rotationY = deltaX / 180;
 			rotationZ = deltaY / 180;
