@@ -4,10 +4,19 @@ import fragmentShaderSrc from './fragment.glsl.js'
 var gl = null;
 var vao = null;
 var program = null;
+var posBuffer = null;
+var posAttribLoc = null;
 var vertexCount = 0;
 var uniformModelViewLoc = null;
 var uniformProjectionLoc = null;
 var heightmapData = null;
+//transformation variables
+var scaleFactor = 1;
+var rotationY = 0;
+var rotationZ = 0;
+var eyeX = 0;
+var eyeY = 0;
+var eyeZ = 5;
 
 function processImage(img)
 {
@@ -71,6 +80,58 @@ window.loadImageFile = function(event)
 			// heightmapData is globally defined
 			heightmapData = processImage(img);
 			
+			var mesh = [];
+			var originY = heightmapData.height / 2;
+			var originX = heightmapData.width / 2;
+
+			for (var row = 0; row < heightmapData.height - 1; row++) {
+				for (var col = 0; col < heightmapData.width - 1; col++) {
+					//corners
+					var topLeft = heightmapData.data[row * heightmapData.width + col];
+					var topRight = heightmapData.data[row * heightmapData.width + (col + 1)];
+					var bottomLeft = heightmapData.data[(row + 1) * heightmapData.width + col];
+					var bottomRight = heightmapData.data[(row + 1) * heightmapData.width + (col + 1)];
+
+					var x0 = 5 * (col - originX) / heightmapData.width;
+					var x1 = 5 * ((col + 1) - originX) / heightmapData.width;
+					var y0 = 5 * (row - originY)/ heightmapData.height;
+					var y1 = 5 * ((row + 1) - originY) / heightmapData.height;
+
+					// Triangle 1: top-left, bottom-left, top-right
+					var triangle1 = [
+						x0, topLeft, y0,
+						x0, bottomLeft, y1,
+						x1, topRight, y0
+					];
+					
+					mesh.push(...triangle1);
+					
+					// Triangle 2: top-right, bottom-left, bottom-right
+					var triangle2 = [
+						x1, topRight, y0,
+						x0, bottomLeft, y1,
+						x1, bottomRight, y1
+					];
+					
+					mesh.push(...triangle2);
+				}
+			}
+			vertexCount = mesh.length / 3;
+			var triangleMeshVertices = new Float32Array(mesh);
+			posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, triangleMeshVertices);
+			
+			posAttribLoc = gl.getAttribLocation(program, "position");
+			vao = createVAO(gl, 
+			// positions
+			posAttribLoc, posBuffer, 
+
+			// normals (unused in this assignments)
+			null, null, 
+
+			// colors (not needed--computed by shader)
+			null, null
+			);
+			
 			/*
 				TODO: using the data in heightmapData, create a triangle mesh
 					heightmapData.data: array holding the actual data, note that 
@@ -116,28 +177,46 @@ function draw()
 	var farClip = 20.0;
 
 	// perspective projection
-	var projectionMatrix = perspectiveMatrix(
-		fovRadians,
-		aspectRatio,
-		nearClip,
-		farClip,
-	);
+	var projectionMatrix;
+	if (document.querySelector("#projection").value == 'perspective')
+	{
+		projectionMatrix= perspectiveMatrix(
+			fovRadians,
+			aspectRatio,
+			nearClip,
+			farClip,
+		);
+	}
+	else {
+		// TODO: implement orthographic projection 
+		// (see helper function in utils.js)
+		//the 2.8 is some scaling number that was found by trial and error to make the swap between the two projections seamless
+		var left =  2.8 * -aspectRatio;
+		var right = 2.8 * +aspectRatio;
+		var bottom = -2.8;
+		var top = 2.8;
+		projectionMatrix = orthographicMatrix(left, right, bottom, top, nearClip, farClip);
+	}
 
 	// eye and target
-	var eye = [0, 5, 5];
+	var eye = [eyeX, eyeY, 5];
+	//var eye = [eyeX, 0, eyeZ];
 	var target = [0, 0, 0];
-
-	var modelMatrix = identityMatrix();
+	
 
 	// TODO: set up transformations to the model
-
+	var heightScale = parseInt(document.querySelector("#height").value)/500;
+	var modelMatrix = multiplyMatrices(rotateYMatrix(rotationY), rotateZMatrix(rotationZ)); //rotating
+	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(scaleFactor, scaleFactor, scaleFactor)); //zooming
+	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(1, heightScale, 1)); //height slider
+	
 	// setup viewing matrix
 	var eyeToTarget = subtract(target, eye);
+	target = add(eye, [0, 0, -1]);
 	var viewMatrix = setupViewMatrix(eye, target);
 
 	// model-view Matrix = view * model
 	var modelviewMatrix = multiplyMatrices(viewMatrix, modelMatrix);
-
 
 	// enable depth testing
 	gl.enable(gl.DEPTH_TEST);
@@ -257,9 +336,11 @@ function addMouseCallback(canvas)
 		if (e.deltaY < 0) 
 		{
 			console.log("Scrolled up");
+			scaleFactor+=0.1;
 			// e.g., zoom in
 		} else {
 			console.log("Scrolled down");
+			scaleFactor-=0.1;
 			// e.g., zoom out
 		}
 	});
@@ -274,6 +355,15 @@ function addMouseCallback(canvas)
 		console.log('mouse drag by: ' + deltaX + ', ' + deltaY);
 
 		// implement dragging logic
+		if(leftMouse){
+			eyeX = deltaX / 50;
+			eyeY = -deltaY / 50;
+			//eyeZ = -deltaY / 50;
+		}
+		if(!leftMouse){
+			rotationY = deltaX / 180;
+			rotationZ = deltaY / 180;
+		}
 	});
 
 	document.addEventListener("mouseup", function () {
@@ -302,14 +392,14 @@ function initialize()
 
 	// create buffers to put in box
 	var boxVertices = new Float32Array(box['positions']);
-	var posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, boxVertices);
+	posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, boxVertices);
 
 	var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSrc);
 	var fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSrc);
 	program = createProgram(gl, vertexShader, fragmentShader);
 
 	// attributes (per vertex)
-	var posAttribLoc = gl.getAttribLocation(program, "position");
+	posAttribLoc = gl.getAttribLocation(program, "position");
 
 	// uniforms
 	uniformModelViewLoc = gl.getUniformLocation(program, 'modelview');
