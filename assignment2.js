@@ -4,6 +4,7 @@ import fragmentShaderSrc from './fragment.glsl.js'
 var gl = null;
 var vao = null;
 var program = null;
+var posBuffer = null;
 var vertexCount = 0;
 var uniformModelViewLoc = null;
 var uniformProjectionLoc = null;
@@ -14,6 +15,7 @@ var rotationY = 0;
 var rotationZ = 0;
 var eyeX = 0;
 var eyeY = 0;
+var eyeZ = 5;
 
 function processImage(img)
 {
@@ -77,35 +79,29 @@ window.loadImageFile = function(event)
 			// heightmapData is globally defined
 			heightmapData = processImage(img);
 			
-			var positions = [];
+			var mesh = [];
 			
-			// Create a grid of triangles
-			// Loop through each cell in the grid (we'll make 2 triangles per cell)
-			for (var y = 0; y < heightmapData.height - 1; y++) {
-				for (var x = 0; x < heightmapData.width - 1; x++) {
-					// Get the height values at the four corners of this cell
-					var topLeft = heightmapData.data[y * heightmapData.width + x];
-					var topRight = heightmapData.data[y * heightmapData.width + (x + 1)];
-					var bottomLeft = heightmapData.data[(y + 1) * heightmapData.width + x];
-					var bottomRight = heightmapData.data[(y + 1) * heightmapData.width + (x + 1)];
-					
-					// Convert grid coordinates to world coordinates
-					// Center the mesh at origin and scale it appropriately
-					var scale = 5.0 / Math.max(heightmapData.width, heightmapData.height); // Scale to fit in a reasonable size
-					
-					var x0 = (x - heightmapData.width / 2) * scale;
-					var x1 = ((x + 1) - heightmapData.width / 2) * scale;
-					var y0 = (y - heightmapData.height / 2) * scale;
-					var y1 = ((y + 1) - heightmapData.height / 2) * scale;
-					
-					// Create two triangles for this grid cell
+			for (var row = 0; row < heightmapData.height - 1; row++) {
+				for (var col = 0; col < heightmapData.width - 1; col++) {
+					//corners
+					var topLeft = heightmapData.data[row * heightmapData.width + col];
+					var topRight = heightmapData.data[row * heightmapData.width + (col + 1)];
+					var bottomLeft = heightmapData.data[(row + 1) * heightmapData.width + col];
+					var bottomRight = heightmapData.data[(row + 1) * heightmapData.width + (col + 1)];
+
+					var x0 = 5 * (col - heightmapData.width / 2) / heightmapData.height;
+					var x1 = 5 * ((col + 1) - heightmapData.width / 2) / heightmapData.height;
+					var y0 = 5 * (row - heightmapData.height / 2)/ heightmapData.height;
+					var y1 = 5 * ((row + 1) - heightmapData.height / 2) / heightmapData.height;
+
 					// Triangle 1: top-left, bottom-left, top-right
 					var triangle1 = [
 						x0, topLeft, y0,
 						x0, bottomLeft, y1,
 						x1, topRight, y0
 					];
-					positions.push(...triangle1);
+					
+					mesh.push(...triangle1);
 					
 					// Triangle 2: top-right, bottom-left, bottom-right
 					var triangle2 = [
@@ -113,14 +109,14 @@ window.loadImageFile = function(event)
 						x0, bottomLeft, y1,
 						x1, bottomRight, y1
 					];
-					positions.push(...triangle2);
+					
+					mesh.push(...triangle2);
 				}
 			}
-			vertexCount = positions.length / 3;
-			var meshVertices = new Float32Array(positions);
-			var posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, meshVertices);
+			vertexCount = mesh.length / 3;
+			var triangleMeshVertices = new Float32Array(mesh);
+			posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, triangleMeshVertices);
 			
-			// Update the VAO with the new position buffer
 			var posAttribLoc = gl.getAttribLocation(program, "position");
 			vao = createVAO(gl, 
 			// positions
@@ -191,23 +187,24 @@ function draw()
 	else {
 		// TODO: implement orthographic projection 
 		// (see helper function in utils.js)
-		var left =  5 * -aspectRatio;
-		var right = 5 * +aspectRatio;
-		var bottom = -5;
-		var top = 5;
+		var left =  2.8 * -aspectRatio;
+		var right = 2.8 * +aspectRatio;
+		var bottom = -2.8;
+		var top = 2.8;
 		projectionMatrix = orthographicMatrix(left, right, bottom, top, nearClip, farClip);
 	}
 
 	// eye and target
 	var eye = [eyeX, eyeY, 5];
+	//var eye = [eyeX, 0, eyeZ];
 	var target = [0, 0, 0];
 	
 
 	// TODO: set up transformations to the model
 	var heightScale = parseInt(document.querySelector("#height").value)/500;
-	var modelMatrix = multiplyMatrices(rotateYMatrix(rotationY), rotateZMatrix(rotationZ));
-	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(scaleFactor, scaleFactor, scaleFactor));
-	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(1, heightScale, 1));
+	var modelMatrix = multiplyMatrices(rotateYMatrix(rotationY), rotateZMatrix(rotationZ)); //rotating
+	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(scaleFactor, scaleFactor, scaleFactor)); //zooming
+	modelMatrix = multiplyMatrices(modelMatrix, scaleMatrix(1, heightScale, 1)); //height slider
 	
 	// setup viewing matrix
 	var eyeToTarget = subtract(target, eye);
@@ -357,6 +354,7 @@ function addMouseCallback(canvas)
 		if(leftMouse){
 			eyeX = deltaX / 50;
 			eyeY = -deltaY / 50;
+			//eyeZ = -deltaY / 50;
 		}
 		if(!leftMouse){
 			rotationY = deltaX / 180;
@@ -390,7 +388,7 @@ function initialize()
 
 	// create buffers to put in box
 	var boxVertices = new Float32Array(box['positions']);
-	var posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, boxVertices);
+	posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, boxVertices);
 
 	var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSrc);
 	var fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSrc);
