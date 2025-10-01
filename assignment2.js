@@ -5,6 +5,7 @@ var gl = null;
 var vao = null;
 var program = null;
 var posBuffer = null;
+var posAttribLoc = null;
 var vertexCount = 0;
 var uniformModelViewLoc = null;
 var uniformProjectionLoc = null;
@@ -80,7 +81,9 @@ window.loadImageFile = function(event)
 			heightmapData = processImage(img);
 			
 			var mesh = [];
-			
+			var originY = heightmapData.height / 2;
+			var originX = heightmapData.width / 2;
+
 			for (var row = 0; row < heightmapData.height - 1; row++) {
 				for (var col = 0; col < heightmapData.width - 1; col++) {
 					//corners
@@ -89,10 +92,10 @@ window.loadImageFile = function(event)
 					var bottomLeft = heightmapData.data[(row + 1) * heightmapData.width + col];
 					var bottomRight = heightmapData.data[(row + 1) * heightmapData.width + (col + 1)];
 
-					var x0 = 5 * (col - heightmapData.width / 2) / heightmapData.height;
-					var x1 = 5 * ((col + 1) - heightmapData.width / 2) / heightmapData.height;
-					var y0 = 5 * (row - heightmapData.height / 2)/ heightmapData.height;
-					var y1 = 5 * ((row + 1) - heightmapData.height / 2) / heightmapData.height;
+					var x0 = 5 * (col - originX) / heightmapData.width;
+					var x1 = 5 * ((col + 1) - originX) / heightmapData.width;
+					var y0 = 5 * (row - originY)/ heightmapData.height;
+					var y1 = 5 * ((row + 1) - originY) / heightmapData.height;
 
 					// Triangle 1: top-left, bottom-left, top-right
 					var triangle1 = [
@@ -117,7 +120,7 @@ window.loadImageFile = function(event)
 			var triangleMeshVertices = new Float32Array(mesh);
 			posBuffer = createBuffer(gl, gl.ARRAY_BUFFER, triangleMeshVertices);
 			
-			var posAttribLoc = gl.getAttribLocation(program, "position");
+			posAttribLoc = gl.getAttribLocation(program, "position");
 			vao = createVAO(gl, 
 			// positions
 			posAttribLoc, posBuffer, 
@@ -187,6 +190,7 @@ function draw()
 	else {
 		// TODO: implement orthographic projection 
 		// (see helper function in utils.js)
+		//the 2.8 is some scaling number that was found by trial and error to make the swap between the two projections seamless
 		var left =  2.8 * -aspectRatio;
 		var right = 2.8 * +aspectRatio;
 		var bottom = -2.8;
@@ -395,7 +399,7 @@ function initialize()
 	program = createProgram(gl, vertexShader, fragmentShader);
 
 	// attributes (per vertex)
-	var posAttribLoc = gl.getAttribLocation(program, "position");
+	posAttribLoc = gl.getAttribLocation(program, "position");
 
 	// uniforms
 	uniformModelViewLoc = gl.getUniformLocation(program, 'modelview');
